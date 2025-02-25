@@ -62,3 +62,26 @@ ssh-keygen -t rsa -C "your_email@example.com" -f ./tf-cloud-init
 When prompted, press enter to leave the passphrase blank on this key.
 
 You will need to copy the key into the Terraform files, and will reference it in Ansible and SSH connections.
+
+## Terraform Setup
+
+Terraform will do the heavy listing with creating the VMs for the Kubernetes cluster.
+Customise the main.tf with Proxmox Provider:
+- pm_api_url.
+- pm_user and pm_password or pm_api_token_id and pm_api_token_secret.
+- target_node for the k8s-master and k8s-node sections.
+
+You should also set:
+- Relevant IP addresses, DNS and Gateway details for your environment.
+- VMIDs (these are important as they stop Proxmox trying to re-use the same VMID immediately).
+- cloud-init template name.
+
+With these configured, run the following in the terraform subdirectory.
+```
+terraform init
+terraform apply
+```
+
+Confirm by typing "yes" and wait for the cloning to complete.
+
+## Ansible Setup
