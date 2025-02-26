@@ -110,7 +110,6 @@ The playbook will run and configure all the Kubernetes machines with the require
 When this has completed, run the following:
 ```
 ansible-playbook k8s-master.yml -i k8s-inventory.yml
-
 ```
 This will configure your designated k8s-master VM as the Kubernetes master node.
 
@@ -167,3 +166,39 @@ Run the script using:
 ```
 ./join-nodes.sh
 ```
+When the script finishes, you should be able to see the nodes as present using "sudo kubectl get nodes" as described above.
+
+You should now have a working Kubernetes cluster.
+
+## Testing the cluster using Nginx and NodePort
+
+Services in Kubernetes run by default without being exposed to networks outside the cluster, and need to be configured for this.
+On cloud services, there is integration for load balancers, but with a bare-metal or home lab Kubernetes cluster, you are unlikely to have this.
+NodePort provides an alternative to load balancing, but will expose the service on only one node. If the node goes offline, the service will not be available - and it can also move if not configured for a specific node.
+NodePort is fine for testing purposes.
+
+Copy the nginx-nodeport-test.yml file to the kubernetes master, and run:
+```
+sudo kubectl apply -f nginx-nodeport-test.yml
+```
+You can then confirm which node the service is running on using the following command:
+```
+user@k8s-master:~$ sudo kubectl get pods -o wide
+```
+The response should show something like the following:
+```
+NAME                         READY   STATUS    RESTARTS   AGE   IP           NODE        NOMINATED NODE   READINESS GATES
+app-server-5888f8477-zlr2g   1/1     Running   0          24h   10.244.3.5   k8s-node3   <none>           <none>
+```
+The node on which the service is running is k8s-node3 - you should be able to infer the IP address of this from your configuration, and connect to it on port 3200 using your browser or by curl command, eg.
+```
+curl http://192.168.5.233:32000/
+```
+The default nginx page should be returned.
+
+# Additional configuration
+
+You should have a working, tested Kubernetes cluster at this point, but there are a few additional components that you may wish to install for ease of use and extra functionality. These are:
+- Helm - to allow the use of helm charts.
+- Kubernetes dashboard - a web based Kubernetes UI.
+- MetalLB - a bare metal load balancer that will provide high availability for services without requiring additional network hardware.
