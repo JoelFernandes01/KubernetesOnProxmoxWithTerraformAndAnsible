@@ -8,10 +8,9 @@ This set of instructions has been tested on Ubuntu VMs running on Proxmox, and c
 
 You should run these setup commands from an Infrastructure as Code staging VM, separate from the Kubernetes cluster, but can be your workstation if you run on Linux natively.
 
-** Note - WSL has some file system limitations that will make the installation hard with Ansible and private keys.**
+**Note - WSL has some file system limitations that will make the installation hard with Ansible and private keys. It does work perfectly for running kubectl commands as per the latter parts of these instructions.**
 
 **Further Note - You may be tempted to try LXC on Proxmox instead of using VMs but it throws errors on the Kubernetes installation swap memory step.**
-
 
 
 The Terraform files are designed to work with the Ubuntu 24.04 cloud-init image.
@@ -20,7 +19,7 @@ You will also need to customise your image as per [https://youtu.be/HbBblJOZs-c]
 
 ## Pre-requisites
 
-You will need the following to be installed and set up:
+You will need the following to be installed and set up on your Infrastructure as Code machine:
 
 - Terraform
 - Ansible
@@ -115,7 +114,7 @@ This will configure your designated k8s-master VM as the Kubernetes master node.
 
 ## Building the cluster
 
-The final steps to building the Kubernetes cluster are to run join commands - this can be automated via the join-nodes.sh script, but the individual commands are as follows.
+The final steps to building the Kubernetes cluster are to run join commands - this can be automated via the join-nodes.sh script (which is the recommended approach), but the individual commands are as follows.
 
 On the master, get the join token and command:
 ```
@@ -170,6 +169,8 @@ When the script finishes, you should be able to see the nodes as present using "
 
 You should now have a working Kubernetes cluster.
 
+The join-nodes.sh script will also copy the Kubernetes cluster /etc/kubernetes/admin.conf file back to the staging machine as /home/$USER/.kube/conf, allowing kubectl to be run from there if this is desired.
+
 ## Testing the cluster using Nginx and NodePort
 
 Services in Kubernetes run by default without being exposed to networks outside the cluster, and need to be configured for this.
@@ -196,9 +197,65 @@ curl http://192.168.5.233:32000/
 ```
 The default nginx page should be returned.
 
+There is a nice overview [here](https://medium.com/@seanlinsanity/how-to-expose-applications-running-in-kubernetes-cluster-to-public-access-65c2fa959a3b) by [Sean Lin](https://medium.com/@seanlinsanity)that covers the different ways to expose services, and from which the nginx NodePort test has been taken. 
+
 # Additional configuration
 
 You should have a working, tested Kubernetes cluster at this point, but there are a few additional components that you may wish to install for ease of use and extra functionality. These are:
+- Setting up local access for Kubectl.
 - Helm - to allow the use of helm charts.
-- Kubernetes dashboard - a web based Kubernetes UI.
 - MetalLB - a bare metal load balancer that will provide high availability for services without requiring additional network hardware.
+
+**Note: The Kubernetes dashboard was also considered and explored, but most users will be better off with Lens in my opinion.**
+
+## Setting up local access for Kubectl.
+
+If you have been following these steps closely, you will have used an Infrastructure as Code staging machine to provision and then access the Kubernetes machines.
+
+For ease of use going forward, we need a local toolset to access the Kubernetes cluster directly.
+
+On your workstation, as per https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/#install-using-native-package-management, you need to do the following:
+
+```
+sudo apt-get update
+sudo apt-get install -y apt-transport-https ca-certificates curl gnupg
+curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.32/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+sudo chmod 644 /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.32/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list
+sudo chmod 644 /etc/apt/sources.list.d/kubernetes.list
+sudo apt-get update
+sudo apt-get install -y kubectl
+```
+
+You can now run sudo kubectl cluster-info but it will effectively tell you that it can't find a cluster.
+
+You need to copy the /etc/kubernetes/admin.conf file from the master node back to your workstation.
+If you used the join-nodes.sh script, it should exist as /home/$USER/.kube/config on the Infrastructure as Code staging machine, and you can copy it back to your local machine as follows:
+
+```
+mkdir $HOME/.kube/
+scp user@192.168.5.185:/home/user/.kube/config $HOME/.kube/
+
+```
+Alternatively, you will need to copy the /etc/kubernetes/admin.conf from the Kubernetes master back to your local machine directly - you should copy the the key files (tf-cloud-init and tf-cloud-init.pub) back to your local machine in order to do this. 
+
+With the config file in place, you should now be able to run kubectl successfully if you specify the config file location, eg:
+
+```
+$ sudo kubectl get service --kubeconfig /home/$USER/.kube/config
+
+NAME          TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)        AGE
+app-service   NodePort    10.101.69.93   <none>        80:32000/TCP   2d2h
+kubernetes    ClusterIP   10.96.0.1      <none>        443/TCP        3d15h
+```
+
+The config file can also be used to run the Lens IDE, which is a good graphical UI for Kubernetes.
+
+
+## Helm installation
+
+
+## MetalLB Installation
+
+
+## Test Service with Load Balancer
