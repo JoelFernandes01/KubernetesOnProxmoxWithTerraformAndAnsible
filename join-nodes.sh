@@ -2,8 +2,8 @@
 set -e
 
 # Variables - modify these as needed
-MASTER_NODE="k8s-master"
-WORKER_NODES=("k8s-node1" "k8s-node2" "k8s-node3")
+MASTER_NODE="192.168.5.230"
+WORKER_NODES=("192.168.5.231" "192.168.5.232" "192.168.5.233")
 SSH_USER="user"
 SSH_OPTIONS="-o StrictHostKeyChecking=no -i tf-cloud-init"
 LOCAL_KUBE_DIR="$HOME/.kube"
