@@ -1,0 +1,65 @@
+---
+- name: Initialize Kubernetes Master Node
+  hosts: k8s_master
+  become: true
+  vars:
+    pod_network_cidr: "10.244.0.0/16"
+  
+  tasks:
+    - name: Initialize Kubernetes cluster
+      command: kubeadm init --pod-network-cidr={{ pod_network_cidr }}
+      register: kubeadm_init
+      # Skip if the cluster is already initialized
+      args:
+        creates: /etc/kubernetes/admin.conf
+
+    - name: Create .kube directory in user's home
+      file:
+        path: "{{ ansible_env.HOME }}/.kube"
+        state: directory
+        mode: '0755'
+      become: false
+
+    - name: Copy kube admin config to user's home directory
+      copy:
+        src: /etc/kubernetes/admin.conf
+        dest: "{{ ansible_env.HOME }}/.kube/config"
+        remote_src: yes
+        mode: '0600'
+      become: false
+
+    - name: Set ownership of kube config file
+      file:
+        path: "{{ ansible_env.HOME }}/.kube/config"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+      become: false
+
+    - name: Download Flannel manifest
+      get_url:
+        url: https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
+        dest: /tmp/kube-flannel.yml
+        mode: '0644'
+      become: false
+
+    - name: Apply Flannel network
+      command: kubectl apply -f /tmp/kube-flannel.yml
+      become: false
+
+    - name: Wait for Flannel pods to be ready
+      command: kubectl wait --for=condition=Ready pods -l app=flannel --namespace kube-flannel --timeout=300s
+      become: false
+      register: flannel_status
+      retries: 30
+      delay: 10
+      until: flannel_status.rc == 0
+
+    - name: Get cluster status
+      command: kubectl get nodes
+      register: cluster_status
+      become: false
+      changed_when: false
+
+    - name: Display cluster status
+      debug:
+        var: cluster_status.stdout_lines

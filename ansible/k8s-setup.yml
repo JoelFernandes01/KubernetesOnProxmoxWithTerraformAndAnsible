@@ -1,0 +1,81 @@
+---
+    - name: Setup Kubernetes Dependencies
+      hosts: all
+      become: true
+      tasks:
+        - name: Update apt cache and upgrade packages
+          apt:
+            update_cache: yes
+            upgrade: yes
+    
+        - name: Install required packages
+          apt:
+            name: 
+              - curl
+              - gpg
+              - docker.io
+            state: present
+    
+        - name: Verify Docker installation
+          command: docker --version
+          register: docker_version
+          changed_when: false
+    
+        - name: Create Kubernetes keyring directory
+          file:
+            path: /etc/apt/keyrings
+            state: directory
+            mode: '0755'
+    
+        - name: Check if Kubernetes GPG key exists
+          stat:
+            path: /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+          register: gpg_key
+
+        - name: Download Kubernetes GPG key
+          get_url:
+            url: https://pkgs.k8s.io/core:/stable:/v1.30/deb/Release.key
+            dest: /tmp/k8s-release.key
+            mode: '0644'
+          when: not gpg_key.stat.exists
+
+        - name: Import Kubernetes GPG key
+          command: gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg /tmp/k8s-release.key
+          when: not gpg_key.stat.exists
+    
+        - name: Add Kubernetes repository
+          copy:
+            content: "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.32/deb/ /\n"
+            dest: /etc/apt/sources.list.d/kubernetes.list
+            mode: '0644'
+    
+        - name: Update apt cache
+          apt:
+            update_cache: yes
+    
+        - name: Install Kubernetes packages
+          apt:
+            name:
+              - kubelet
+              - kubeadm
+              - kubectl
+            state: present
+    
+        - name: Hold Kubernetes packages
+          dpkg_selections:
+            name: "{{ item }}"
+            selection: hold
+          loop:
+            - kubelet
+            - kubeadm
+            - kubectl
+    
+        - name: Disable swap
+          command: swapoff -a
+          changed_when: false
+    
+        - name: Disable swap in fstab
+          replace:
+            path: /etc/fstab
+            regexp: '^([^#].*?\sswap\s+.*)$'
+            replace: '#\1'
