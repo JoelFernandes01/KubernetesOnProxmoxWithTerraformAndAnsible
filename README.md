@@ -81,6 +81,7 @@ You should also set:
 - Relevant IP addresses, DNS and Gateway details for your environment.
 - VMIDs (these are important as they stop Proxmox trying to re-use the same VMID immediately).
 - cloud-init template name.
+- SSH public key values 
 
 With these configured, run the following in the terraform subdirectory.
 ```
@@ -102,13 +103,13 @@ First edit the k8s-inventory.yml file, updating the following:
 
 Next, run the following command in the ansible subdirectory to apply the Kubernetes dependencies.
 ```
-ansible-playbook k8s-setup.yml -i k8s-inventory.yml
+ansible-playbook k8s-setup.yml -i k8s-inventory.yml  --key-file ../tf-cloud-init
 ```
 The playbook will run and configure all the Kubernetes machines with the required dependencies.
 
 When this has completed, run the following:
 ```
-ansible-playbook k8s-master.yml -i k8s-inventory.yml
+ansible-playbook k8s-master.yml -i k8s-inventory.yml --key-file ../tf-cloud-init
 ```
 This will configure your designated k8s-master VM as the Kubernetes master node.
 
@@ -178,7 +179,11 @@ On cloud services, there is integration for load balancers, but with a bare-meta
 NodePort provides an alternative to load balancing, but will expose the service on only one node. If the node goes offline, the service will not be available - and it can also move if not configured for a specific node.
 NodePort is fine for testing purposes.
 
-Copy the nginx-nodeport-test.yml file to the kubernetes master, and run:
+Note: You can connect to the Kubernetes master from the staging machine using:
+```
+ssh user@192.168.5.230 -i tf-cloud-init -o StrictHostKeyChecking=no 
+```
+Download the nginx-nodeport-test.yml file from the repo (wget nginx-nodeport-test.yml) or copy the nginx-nodeport-test.yml file to the kubernetes master, and run:
 ```
 sudo kubectl apply -f nginx-nodeport-test.yml
 ```
@@ -254,8 +259,20 @@ The config file can also be used to run the Lens IDE, which is a good graphical 
 
 ## Helm installation
 
+As detailed here [https://helm.sh/docs/intro/install/](https://helm.sh/docs/intro/install/)
+
+Run the following commands:
+
+```
+$ curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+$ chmod 700 get_helm.sh
+$ ./get_helm.sh
+```
 
 ## MetalLB Installation
 
+Download the metallb manifest:
+
+wget https://raw.githubusercontent.com/metallb/metallb/v0.14.9/config/manifests/metallb-native.yaml
 
 ## Test Service with Load Balancer
