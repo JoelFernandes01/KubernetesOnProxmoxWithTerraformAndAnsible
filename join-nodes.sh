@@ -6,6 +6,8 @@ MASTER_NODE="k8s-master"
 WORKER_NODES=("k8s-node1" "k8s-node2" "k8s-node3")
 SSH_USER="user"
 SSH_OPTIONS="-o StrictHostKeyChecking=no -i tf-cloud-init"
+LOCAL_KUBE_DIR="$HOME/.kube"
+LOCAL_KUBE_CONFIG="$LOCAL_KUBE_DIR/config"
 
 # Function to check if command exists
 command_exists() {
@@ -110,6 +112,48 @@ done
 # Verify final cluster status
 echo "Final cluster status:"
 ssh $SSH_OPTIONS $SSH_USER@$MASTER_NODE "sudo kubectl get nodes -o wide"
+
+echo ""
+echo "=== Copying Kubernetes admin config to local machine ==="
+
+# Create local .kube directory if it doesn't exist
+if [ ! -d "$LOCAL_KUBE_DIR" ]; then
+  echo "Creating local directory $LOCAL_KUBE_DIR..."
+  mkdir -p "$LOCAL_KUBE_DIR"
+fi
+
+# Backup existing config if it exists
+if [ -f "$LOCAL_KUBE_CONFIG" ]; then
+  echo "Backing up existing kubectl config to ${LOCAL_KUBE_CONFIG}.bak..."
+  cp "$LOCAL_KUBE_CONFIG" "${LOCAL_KUBE_CONFIG}.bak"
+fi
+
+# Create a temporary file on the master node with correct permissions
+echo "Creating a temporary copy of admin.conf with correct permissions..."
+ssh $SSH_OPTIONS $SSH_USER@$MASTER_NODE "sudo cp /etc/kubernetes/admin.conf /tmp/k8s-admin.conf && sudo chmod 644 /tmp/k8s-admin.conf && sudo chown $SSH_USER:$SSH_USER /tmp/k8s-admin.conf"
+
+# Copy the temporary admin.conf from master to local machine
+echo "Copying Kubernetes admin config from $MASTER_NODE to local machine..."
+scp $SSH_OPTIONS $SSH_USER@$MASTER_NODE:"/tmp/k8s-admin.conf" "$LOCAL_KUBE_CONFIG"
+
+# Clean up the temporary file
+ssh $SSH_OPTIONS $SSH_USER@$MASTER_NODE "rm /tmp/k8s-admin.conf"
+
+if [ -f "$LOCAL_KUBE_CONFIG" ]; then
+  echo "Successfully copied admin.conf to $LOCAL_KUBE_CONFIG"
+  chmod 600 "$LOCAL_KUBE_CONFIG"
+  echo "You can now run kubectl commands from your local machine."
+  
+  # Test the connection
+  if command_exists kubectl; then
+    echo "Testing connection to cluster..."
+    kubectl --kubeconfig="$LOCAL_KUBE_CONFIG" get nodes
+  else
+    echo "kubectl not found. Please install it to manage your cluster from this machine."
+  fi
+else
+  echo "Failed to copy admin.conf from master node."
+fi
 
 echo ""
 echo "=== Node join process completed ==="
