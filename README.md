@@ -202,77 +202,7 @@ curl http://192.168.5.233:32000/
 ```
 The default nginx page should be returned.
 
-There is a nice overview [here](https://medium.com/@seanlinsanity/how-to-expose-applications-running-in-kubernetes-cluster-to-public-access-65c2fa959a3b) by [Sean Lin](https://medium.com/@seanlinsanity)that covers the different ways to expose services, and from which the nginx NodePort test has been taken. 
+**Note - NodePort is not correctly explained in the video as traffic will be routed from any node to the node running the service. Using any IP in the cluster should allow the connection.**
 
-# Additional configuration
+There is a nice overview of different ways to expose services [here](https://medium.com/@seanlinsanity/how-to-expose-applications-running-in-kubernetes-cluster-to-public-access-65c2fa959a3b) by [Sean Lin](https://medium.com/@seanlinsanity), and from which the nginx NodePort test has been taken. 
 
-You should have a working, tested Kubernetes cluster at this point, but there are a few additional components that you may wish to install for ease of use and extra functionality. These are:
-- Setting up local access for Kubectl.
-- Helm - to allow the use of helm charts.
-- MetalLB - a bare metal load balancer that will provide high availability for services without requiring additional network hardware.
-
-**Note: The Kubernetes dashboard was also considered and explored, but most users will be better off with Lens in my opinion.**
-
-## Setting up local access for Kubectl.
-
-If you have been following these steps closely, you will have used an Infrastructure as Code staging machine to provision and then access the Kubernetes machines.
-
-For ease of use going forward, we need a local toolset to access the Kubernetes cluster directly.
-
-On your workstation, as per https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/#install-using-native-package-management, you need to do the following:
-
-```
-sudo apt-get update
-sudo apt-get install -y apt-transport-https ca-certificates curl gnupg
-curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.32/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
-sudo chmod 644 /etc/apt/keyrings/kubernetes-apt-keyring.gpg
-echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.32/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list
-sudo chmod 644 /etc/apt/sources.list.d/kubernetes.list
-sudo apt-get update
-sudo apt-get install -y kubectl
-```
-
-You can now run sudo kubectl cluster-info but it will effectively tell you that it can't find a cluster.
-
-You need to copy the /etc/kubernetes/admin.conf file from the master node back to your workstation.
-If you used the join-nodes.sh script, it should exist as /home/$USER/.kube/config on the Infrastructure as Code staging machine, and you can copy it back to your local machine as follows:
-
-```
-mkdir $HOME/.kube/
-scp user@192.168.5.185:/home/user/.kube/config $HOME/.kube/
-
-```
-Alternatively, you will need to copy the /etc/kubernetes/admin.conf from the Kubernetes master back to your local machine directly - you should copy the the key files (tf-cloud-init and tf-cloud-init.pub) back to your local machine in order to do this. 
-
-With the config file in place, you should now be able to run kubectl successfully if you specify the config file location, eg:
-
-```
-$ sudo kubectl get service --kubeconfig /home/$USER/.kube/config
-
-NAME          TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)        AGE
-app-service   NodePort    10.101.69.93   <none>        80:32000/TCP   2d2h
-kubernetes    ClusterIP   10.96.0.1      <none>        443/TCP        3d15h
-```
-
-The config file can also be used to run the Lens IDE, which is a good graphical UI for Kubernetes.
-
-
-## Helm installation
-
-As detailed here [https://helm.sh/docs/intro/install/](https://helm.sh/docs/intro/install/)
-
-Run the following commands:
-
-```
-$ curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
-$ chmod 700 get_helm.sh
-$ ./get_helm.sh
-```
-
-## MetalLB Installation
-
-Download the metallb manifest:
-
-wget https://raw.githubusercontent.com/metallb/metallb/v0.14.9/config/manifests/metallb-native.yaml
-
-## Test Service with Load Balancer
