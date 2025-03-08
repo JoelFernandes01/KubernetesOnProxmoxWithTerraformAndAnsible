@@ -1,4 +1,7 @@
 # Kubernetes On Proxmox With Terraform And Ansible
+Vídeo base
+https://www.youtube.com/watch?v=raIcSbX0AzI&t=121s
+
 
 Configuration and documentation for how to set up Kubernetes on Proxmox with Cloud Init, Ubuntu, TerraForm and Ansible
 
